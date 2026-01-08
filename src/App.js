@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import LandingPage from './components/LandingPage';
-import Lobby from './components/Lobby';
-import Board from './components/board';
+import LandingPage from './pages/LandingPage';
+import Lobby from './pages/Lobby';
+import Board from './pages/Board';
 
 function App() {
   const [gameCode, setGameCode] = useState('');

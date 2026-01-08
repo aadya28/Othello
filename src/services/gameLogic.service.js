@@ -1,3 +1,12 @@
+// Constants for bomb logic
+const BOARD_SIZE = 8;
+const AFFECTED_CELLS_OFFSET = [
+  { row: -1, col: 0 },  // up
+  { row: 1, col: 0 },   // down
+  { row: 0, col: -1 },  // left
+  { row: 0, col: 1 },   // right
+];
+
 // Function to place a bomb
 export const placeBomb = (row, col, currentPlayer, bomberDucky, bombs, shieldedCells) => {
     // Ensure bomb placement isn't on a shielded cell
@@ -28,19 +37,17 @@ export const placeBomb = (row, col, currentPlayer, bomberDucky, bombs, shieldedC
   
   // Function to trigger bomb explosion
   export const triggerExplosion = (row, col, board, currentPlayer, bombs, shieldedCells) => {
-    const newBoard = board.map(row => row.slice());
+    const newBoard = board.map(rowArr => rowArr.slice());
   
     // List of affected adjacent cells
-    const affectedCells = [
-      { row: row - 1, col: col },
-      { row: row + 1, col: col },
-      { row: row, col: col - 1 },
-      { row: row, col: col + 1 },
-    ];
+    const affectedCells = AFFECTED_CELLS_OFFSET.map(offset => ({
+      row: row + offset.row,
+      col: col + offset.col,
+    }));
   
     // Loop through affected cells and update the board
     affectedCells.forEach(cell => {
-      if (cell.row >= 0 && cell.col >= 0 && cell.row < 8 && cell.col < 8) {
+      if (cell.row >= 0 && cell.col >= 0 && cell.row < BOARD_SIZE && cell.col < BOARD_SIZE) {
         // Ensure shielded cells are not affected
         if (!shieldedCells[currentPlayer].some(([shieldRow, shieldCol]) => shieldRow === cell.row && shieldCol === cell.col)) {
           newBoard[cell.row][cell.col] = { type: 'regular', player: currentPlayer };

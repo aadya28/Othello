@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./landingPage.css";
+import "./LandingPage.css";
+import { PLAYER_COLORS, GAME_MODES, GAME_CODE } from '../constants/gameConstants';
 
 const LandingPage = ({ setGameCode, setPlayerColor }) => {
   const [code, setCode] = useState("");
@@ -9,9 +10,9 @@ const LandingPage = ({ setGameCode, setPlayerColor }) => {
   const navigate = useNavigate();
 
   const createGame = () => {
-    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const newCode = Math.random().toString(GAME_CODE.RADIX).substring(GAME_CODE.LENGTH, GAME_CODE.LENGTH + GAME_CODE.LENGTH).toUpperCase();
     setGameCode(newCode);
-    setPlayerColor("B");
+    setPlayerColor(PLAYER_COLORS.BLUE);
     setCreatedCode(newCode);
     setCopied(false);
   };
@@ -19,7 +20,7 @@ const LandingPage = ({ setGameCode, setPlayerColor }) => {
   const joinGame = () => {
     if (code.trim() === "") return;
     setGameCode(code);
-    setPlayerColor("W");
+    setPlayerColor(PLAYER_COLORS.RED);
     navigate(`/game/${code}`);
   };
 
@@ -34,9 +35,9 @@ const LandingPage = ({ setGameCode, setPlayerColor }) => {
   };
 
   const startGameWithShifu = () => {
-    const gameCode = "shifu";
+    const gameCode = GAME_MODES.SHIFU;
     setGameCode(gameCode);
-    setPlayerColor("B");
+    setPlayerColor(PLAYER_COLORS.BLUE);
     navigate(`/game/${gameCode}`);
   };
 

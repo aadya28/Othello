@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './lobby.css';
+import './Lobby.css';
+import { PLAYER_COLORS, GAME_CODE } from '../constants/gameConstants';
 
 const Lobby = ({ setGameCode, setPlayerColor }) => {
   const [code, setCode] = useState('');
   const navigate = useNavigate();
 
   const createGame = () => {
-    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const newCode = Math.random().toString(GAME_CODE.RADIX).substring(GAME_CODE.LENGTH, GAME_CODE.LENGTH + GAME_CODE.LENGTH).toUpperCase();
     setGameCode(newCode);
-    setPlayerColor('B');
+    setPlayerColor(PLAYER_COLORS.BLUE);
     navigate(`/game/${newCode}`);
   };
 
   const joinGame = () => {
     setGameCode(code);
-    setPlayerColor('R');
+    setPlayerColor(PLAYER_COLORS.RED);
     navigate(`/game/${code}`);
   };
 
