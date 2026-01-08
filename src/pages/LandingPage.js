@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
-import { PLAYER_COLORS, GAME_MODES, GAME_CODE } from '../constants/gameConstants';
+import { PLAYER_COLORS, GAME_MODES } from '../constants/gameConstants';
+import { generateGameCode } from '../utils/gameCodeGenerator';
 
 const LandingPage = ({ setGameCode, setPlayerColor }) => {
   const [code, setCode] = useState("");
@@ -10,7 +11,7 @@ const LandingPage = ({ setGameCode, setPlayerColor }) => {
   const navigate = useNavigate();
 
   const createGame = () => {
-    const newCode = Math.random().toString(GAME_CODE.RADIX).substring(GAME_CODE.LENGTH, GAME_CODE.LENGTH + GAME_CODE.LENGTH).toUpperCase();
+    const newCode = generateGameCode();
     setGameCode(newCode);
     setPlayerColor(PLAYER_COLORS.BLUE);
     setCreatedCode(newCode);
