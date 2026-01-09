@@ -4,9 +4,9 @@
  * @returns {string} Uppercase alphanumeric game code
  */
 export const generateGameCode = (length = 6) => {
-  const radix = 36; // Base-36 (0-9, a-z)
-  return Math.random()
-    .toString(radix)
-    .substring(2, 2 + length)
-    .toUpperCase();
+    const radix = 36; // Base-36 (0-9, a-z)
+    return Math.random()
+        .toString(radix)
+        .substring(2, 2 + length)
+        .toUpperCase();
 };

@@ -1,78 +1,89 @@
-import React, { useState } from "react";
+import React, {useState} from "react";
+import {useNavigate} from 'react-router-dom';
 import "./LandingPage.css";
-import { useGameContext } from '../context/GameContext';
-import { generateGameCode } from '../utils/gameCodeGenerator';
+import {useGameContext} from '../context/GameContext';
+import {generateGameCode} from '../utils/gameCodeGenerator';
+import {PLAYER_COLORS, GAME_MODES} from '../constants/gameConstants';
 
 const LandingPage = () => {
-  const [code, setCode] = useState("");
-  const [createdCode, setCreatedCode] = useState("");
-  const [copied, setCopied] = useState(false);
-  const { createGame: createGameContext, joinGame: joinGameContext, startShifuGame, startGame: startGameContext } = useGameContext();
+    const [code, setCode] = useState("");
+    const [createdCode, setCreatedCode] = useState("");
+    const [copied, setCopied] = useState(false);
+    const {gameCode, setGameCode, setPlayerColor} = useGameContext();
+    const navigate = useNavigate();
 
-  const createGame = () => {
-    const newCode = generateGameCode();
-    createGameContext(newCode);
-    setCreatedCode(newCode);
-    setCopied(false);
-  };
+    const handleCreateGame = () => {
+        const newCode = generateGameCode();
+        setGameCode(newCode);
+        setPlayerColor(PLAYER_COLORS.BLUE);
+        setCreatedCode(newCode);
+        setCopied(false);
+    };
 
-  const joinGame = () => {
-    if (code.trim() === "") return;
-    joinGameContext(code);
-  };
+    const handleJoinGame = () => {
+        const cleanCode = code.trim();
+        if (cleanCode === "") return;
+        setGameCode(cleanCode);
+        setPlayerColor(PLAYER_COLORS.RED);
+        navigate(`/game/${cleanCode}`);
+    };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(createdCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 5000);
-  };
+    const handleCopyToClipboard = () => {
+        navigator.clipboard.writeText(createdCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 5000);
+    };
 
-  const startGame = () => {
-    startGameContext();
-  };
+    const handleStartGame = () => {
+        if (gameCode) {
+            navigate(`/game/${gameCode}`);
+        }
+    };
 
-  const startGameWithShifu = () => {
-    startShifuGame();
-  };
+    const handleStartShifuGame = () => {
+        setGameCode(GAME_MODES.SHIFU);
+        setPlayerColor(PLAYER_COLORS.BLUE);
+        navigate(`/game/${GAME_MODES.SHIFU}`);
+    };
 
-  return (
-    <div className="landing-page">
-      
-      <h1>Welcome to Duckland!</h1>
-      <p className="subtitle">Strategize, Play, and Win with your Duckie Companion!</p>
+    return (
+        <div className="landing-page">
 
-      <button className="glow-button" onClick={createGame}>
-        🏆 Create Game
-      </button>
+            <h1>Welcome to Duckland!</h1>
+            <p className="subtitle">Strategize, Play, and Win with your Duckie Companion!</p>
 
-      {createdCode && (
-        <div className="game-code">
-          <p>Game Code: <span className="game-code-text">{createdCode}</span></p>
-          <button onClick={copyToClipboard} className={`copy-button ${copied ? "copied" : ""}`}>
-            {copied ? "✅ Copied" : "📋 Copy Code"}
-          </button>
-          <button className="start-button" onClick={startGame}>🚀 Start Game</button>
+            <button className="join-game-button" onClick={handleCreateGame}>
+                🏆 Create Game
+            </button>
+
+            {createdCode && (
+                <div className="game-code">
+                    <p>Game Code: <span className="game-code-text">{createdCode}</span></p>
+                    <button onClick={handleCopyToClipboard} className={`copy-button ${copied ? "copied" : ""}`}>
+                        {copied ? "✅ Copied" : "📋 Copy Code"}
+                    </button>
+                    <button className="start-button" onClick={handleStartGame}>🚀 Start Game</button>
+                </div>
+            )}
+
+            <input
+                type="text"
+                className="game-input"
+                placeholder="Enter game code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+            />
+
+            <button className="join-game-button" onClick={handleJoinGame} disabled={!code.trim()}>
+                🔗 Join Game
+            </button>
+
+            <button className="shifu-button" onClick={handleStartShifuGame}>
+                <img src={`${process.env.PUBLIC_URL}/images/Shifu.jpg`} alt="Shifu" className="shifu-img"/>
+                Play Against Shifu
+            </button>
         </div>
-      )}
-
-      <input
-        type="text"
-        className="game-input"
-        placeholder="Enter game code"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-      />
-
-      <button className="glow-button" onClick={joinGame} disabled={!code.trim()}>
-        🔗 Join Game
-      </button>
-
-      <button className="shifu-button" onClick={startGameWithShifu}>
-      <img src={`${process.env.PUBLIC_URL}/images/Shifu.jpg`} alt="Shifu" className="shifu-img" />
-        Play Against Shifu
-      </button>
-    </div>
-  );
+    );
 };
 
 export default LandingPage;
