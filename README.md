@@ -1,19 +1,53 @@
-# Othello Duckies
+# Othello Duckies 🦆
 
-Othello Duckies is a multiplayer Othello game with a twist. Players can place regular pieces, shields, and bombs to add strategic depth to the classic game.
+Othello Duckies is a multiplayer Othello (Reversi) game with a twist! Players can place regular pieces, shields, and bombs to add strategic depth to the classic game. Challenge a friend in multiplayer mode or test your skills against Shifu, the AI opponent.
+
+> **Note:** This is an enhanced fork of the [original WE-Othello project](https://github.com/NavyaNayer/Othello) that is part of the mini-games in the [We-Arcade](https://github.com/WE-Arcade), featuring improved code structure, better organization, and ongoing bug fixes.
+
+## Features
+
+- **Multiplayer Mode**: Create or join games with a unique game code
+- **Shifu AI Mode**: Practice against an AI opponent with witty commentary
+- **Shield Duckies**: Protect cells from being flipped by opponents
+- **Bomber Duckies**: Strategic explosive pieces (coming soon!)
+- **Real-time Gameplay**: Powered by Socket.io for seamless multiplayer experience
+- **Responsive Design**: Play on desktop or mobile devices
+
+## Examples of Platform:
+### Landing Page
+![Landing Page](./screenshots/landing_page.png)
+
+### Multiplayer Mode
+![Multiplayer Mode](./screenshots/multiplayer.png)
+
+### Shifu AI Mode
+![Shifu AI](./screenshots/shifu_ai.png)
+
+## Recent Enhancements
+
+This fork includes significant improvements to the codebase:
+
+- **Better Code Organization**: Restructured into a scalable, production-ready architecture
+  - Separated concerns with `hooks/`, `services/`, `context/`, `constants/`, and `utils/` directories
+  - Split large components into smaller, maintainable pieces
+- **Extracted Business Logic**: Game logic moved to reusable service files
+- **Custom React Hooks**: Created `useGameState`, `useGameLogic`, `useGameSocket`, and `useShifuAI`
+- **Constants & Configuration**: Eliminated magic numbers and hardcoded values
+- **Context API Integration**: Removed prop drilling with centralized state management
+- **Code Consistency**: Applied React best practices and consistent naming conventions
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js
+- Node.js (v14 or higher)
 - npm (Node Package Manager)
 
 ### Installation
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/WE-Arcade/Mini-Games.git
+   git clone <https://github.com/aadya28/Othello>
    ```
 2. Navigate to the project directory:
    ```sh
@@ -26,15 +60,21 @@ Othello Duckies is a multiplayer Othello game with a twist. Players can place re
 
 ### Running the Game
 
-1. Start the server:
+You need to run **both** the WebSocket server and the React app:
+
+1. **Start the WebSocket server** (in one terminal):
    ```sh
    node server.js
    ```
-2. Start the React application:
+   The server will start on `http://localhost:3001`
+
+2. **Start the React application** (in another terminal):
    ```sh
    npm start
    ```
-3. Open [http://localhost:3000](http://localhost:3000) in your browser to play the game.
+   The app will open at `http://localhost:3000`
+
+> **Important:** Both servers must be running for the game to work. The React app (port 3000) communicates with the WebSocket server (port 3001) for all multiplayer and game logic functionality.
 
 ## How to Play
 
@@ -43,10 +83,8 @@ Othello Duckies is a multiplayer Othello game with a twist. Players can place re
 - **Place Pieces**: Click on a cell to place your piece. You can place regular pieces, shields, or bombs.
 - **Win Condition**: The game ends when the board is full or no valid moves are left. The player with the most pieces wins.
 
-## Game Features
-
-- **Regular Ducky**: Standard Othello piece.
-- **Shield Ducky**: Protects a cell from being flipped by the opponent.
-- **Bomber Ducky**: Explodes and affects surrounding cells when triggered. (coming soon!)
-
-
+## Related Projects
+- [WE-Arcade (Github Organisation)](https://github.com/WE-Arcade)
+- [WE-Arcade Repository](https://github.com/WE-Arcade/WE-Arcade)
+- [WE-Arcade Mini-Games Repository](https://github.com/WE-Arcade/Mini-Games)
+- [Original WE-Othello project](https://github.com/NavyaNayer/Othello)

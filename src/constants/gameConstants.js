@@ -94,7 +94,7 @@ export const TIMINGS = {
 
 // Server configuration
 export const SERVER_CONFIG = {
-  URL: process.env.REACT_APP_SERVER_URL || 'http://localhost:3000',
+  URL: process.env.REACT_APP_SERVER_URL || 'http://localhost:3001',
   RECONNECTION: true,
   RECONNECTION_DELAY: 1000,
   RECONNECTION_DELAY_MAX: 5000,
