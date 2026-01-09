@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Board.css';
-import { CELL_TYPES, GAME_MODES, IMAGE_PATHS, PLAYER_COLORS, TIMINGS } from '../constants/gameConstants';
+import { CELL_TYPES, GAME_MODES, PLAYER_COLORS, TIMINGS } from '../constants/gameConstants';
 import { getRandomElement } from '../utils/randomHelpers';
 import { cloneBoard } from '../utils/boardHelpers';
 import { displayNotification } from '../utils/notificationHelper';
@@ -9,10 +9,18 @@ import useGameState from '../hooks/useGameState';
 import useGameLogic from '../hooks/useGameLogic';
 import useGameSocket from '../hooks/useGameSocket';
 import useShifuAI from '../hooks/useShifuAI';
+import GameCell from '../components/GameCell';
+import DuckySelector from '../components/DuckySelector';
+import PieceCounter from '../components/PieceCounter';
+import ShifuDisplay from '../components/ShifuDisplay';
+import GameOverModal from '../components/GameOverModal';
+import TopNavigation from '../components/TopNavigation';
+import Notification from '../components/Notification';
 
 const Board = () => {
   const { gameCode } = useParams();
   const navigate = useNavigate();
+  const [notificationMessage, setNotificationMessage] = useState(null);
 
   // Game state management
   const gameState = useGameState();
@@ -220,161 +228,64 @@ const Board = () => {
     socket.emit('makeMove', { gameCode, move });
   };
 
-  const renderGameCell = (row, col) => {
-    const isValid = validMoves.some(([validRow, validCol]) => validRow === row && validCol === col);
-    const piece = board[row][col];
-
-    let imageSrc = '';
-    if (piece.player === PLAYER_COLORS.BLUE) {
-      if (piece.type === CELL_TYPES.REGULAR) {
-        imageSrc = IMAGE_PATHS.BLUE_DUCKIE;
-      } else if (piece.type === CELL_TYPES.SHIELD) {
-        imageSrc = IMAGE_PATHS.BLUE_SHIELD;
-      } else if (piece.type === CELL_TYPES.BOMB) {
-        imageSrc = IMAGE_PATHS.BLUE_BOMB;
-      }
-    } else if (piece.player === PLAYER_COLORS.RED) {
-      if (piece.type === CELL_TYPES.REGULAR) {
-        imageSrc = IMAGE_PATHS.RED_DUCKIE;
-      } else if (piece.type === CELL_TYPES.SHIELD) {
-        imageSrc = IMAGE_PATHS.RED_SHIELD;
-      } else if (piece.type === CELL_TYPES.BOMB) {
-        imageSrc = IMAGE_PATHS.RED_BOMB;
-      }
-    }
-
-    return (
-      <div
-        key={`${row}-${col}`}
-        className={`cell ${isValid ? 'valid-move' : ''}`}
-        onClick={() => handleCellClick(row, col)}
-      >
-        {imageSrc && <img src={imageSrc} alt={piece.type} className="piece-image" />}
-      </div>
-    );
-  };
 
   return (
     <div className="board-container">
-      {/* Top Buttons */}
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      {/* Top Navigation */}
+      <TopNavigation 
+        onHome={() => navigate('/')} 
+        onRestart={handleRestartGame} 
       />
 
-      <div className="top-buttons">
-        <button className="icon-button" title="Home" onClick={() => navigate('/')}>
-          <span className="material-icons">home</span>
-        </button>
-        <button className="icon-button" title="Restart" onClick={handleRestartGame}>
-          <span className="material-icons">restart_alt</span>
-        </button>
-      </div>
+      {/* Piece Counter */}
+      <PieceCounter blueCount={blueCount} redCount={redCount} />
 
-      {/* Piece Count*/}
-      <div className="piece-count-container">
-        <div className="piece-count">
-          <div>
-            <img
-              className="duckie-img"
-              src={IMAGE_PATHS.BLUE_DUCKIE}
-              alt="Blue Ducky"
-            />
-            : {blueCount}
-          </div>
-          <div>
-            <img
-              className="duckie-img"
-              src={IMAGE_PATHS.RED_DUCKIE}
-              alt="Red Ducky"
-            />
-            : {redCount}
-          </div>
-        </div>
-      </div>
-
-      {/* Shifu (centered) */}
+      {/* Shifu Display */}
       {gameCode === GAME_MODES.SHIFU && (
-        <div className="shifu-center-container">
-          <div className="shifu-container">
-            <img
-              className="shifu-img"
-              src={IMAGE_PATHS.SHIFU}
-              alt="Shifu Opponent"
-            />
-            <p className="shifu-label">Shifu Opponent</p>
-            <div className={`shifu-speech-bubble ${shifuComment ? 'visible' : 'hidden'}`}>
-              <p>{shifuComment}</p>
-            </div>
-          </div>
-        </div>
+        <ShifuDisplay comment={shifuComment} />
       )}
 
-      {/* Game Over Message */}
-      {gameOver && (
-        <div className="game-over">
-          <h2>Game Over</h2>
-          <p>{winner === 'Draw' ? "It's a Draw!" : `${winner} Wins!`}</p>
-          <button onClick={handleRestartGame}>Restart Game</button>
-        </div>
-      )}
+      {/* Game Over Modal */}
+      <GameOverModal 
+        isGameOver={gameOver} 
+        winner={winner} 
+        onRestart={handleRestartGame} 
+      />
 
       {/* Game Board */}
       <div className={`board ${gameOver ? 'disabled' : ''}`}>
         {board.map((row, rowIndex) =>
-          row.map((_, colIndex) => renderGameCell(rowIndex, colIndex))
+          row.map((_, colIndex) => {
+            const isValid = validMoves.some(
+              ([validRow, validCol]) => validRow === rowIndex && validCol === colIndex
+            );
+            return (
+              <GameCell
+                key={`${rowIndex}-${colIndex}`}
+                row={rowIndex}
+                col={colIndex}
+                piece={board[rowIndex][colIndex]}
+                isValid={isValid}
+                onClick={handleCellClick}
+              />
+            );
+          })
         )}
       </div>
 
-      {/* Ducky Selection */}
-      <div className="ducky-selection">
-        {/* Regular Ducky */}
-        <button
-          onClick={() => setSelectedDucky(CELL_TYPES.REGULAR)}
-          className={selectedDucky === CELL_TYPES.REGULAR ? 'selected' : ''}
-        >
-          <p className="button-text">Regular Ducky</p>
-          <img
-            className="duckie-img"
-            src={assignedColor === PLAYER_COLORS.BLUE ? IMAGE_PATHS.BLUE_DUCKIE : IMAGE_PATHS.RED_DUCKIE}
-            alt="Regular Ducky"
-          />
-        </button>
+      {/* Ducky Selector */}
+      <DuckySelector
+        selectedDucky={selectedDucky}
+        onSelect={setSelectedDucky}
+        assignedColor={assignedColor}
+        shieldUsed={shieldUsed}
+      />
 
-        {/* Shield Ducky */}
-        <button
-          onClick={() => {
-            if (shieldUsed[assignedColor]) {
-              displayNotification('You can only use the shield once!');
-            } else {
-              setSelectedDucky(CELL_TYPES.SHIELD);
-            }
-          }}
-          className={`${selectedDucky === CELL_TYPES.SHIELD ? 'selected' : ''} ${
-            shieldUsed[assignedColor] ? 'disabled' : ''
-          }`}
-        >
-          <p className="button-text">Shield Ducky</p>
-          <img
-            className="duckie-img"
-            src={assignedColor === PLAYER_COLORS.BLUE ? IMAGE_PATHS.BLUE_SHIELD : IMAGE_PATHS.RED_SHIELD}
-            alt="Shield Ducky"
-          />
-        </button>
-
-        {/* Bomber Ducky */}
-        <button
-          onClick={() => setSelectedDucky(CELL_TYPES.BOMB)}
-          className={selectedDucky === CELL_TYPES.BOMB ? 'selected' : ''}
-        >
-          <p className="button-text">Bomber Ducky</p>
-          <img
-            className="duckie-img"
-            src={assignedColor === PLAYER_COLORS.BLUE ? IMAGE_PATHS.BLUE_BOMB : IMAGE_PATHS.RED_BOMB}
-            alt="Bomber Ducky"
-          />
-        </button>
-      </div>
+      {/* Notification */}
+      <Notification 
+        message={notificationMessage} 
+        onClose={() => setNotificationMessage(null)} 
+      />
     </div>
   );
 };

@@ -1,24 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './Lobby.css';
-import { PLAYER_COLORS } from '../constants/gameConstants';
+import { useGameContext } from '../context/GameContext';
 import { generateGameCode } from '../utils/gameCodeGenerator';
 
-const Lobby = ({ setGameCode, setPlayerColor }) => {
+const Lobby = () => {
   const [code, setCode] = useState('');
-  const navigate = useNavigate();
+  const { createGame: createGameContext, joinGame: joinGameContext } = useGameContext();
 
   const createGame = () => {
     const newCode = generateGameCode();
-    setGameCode(newCode);
-    setPlayerColor(PLAYER_COLORS.BLUE);
-    navigate(`/game/${newCode}`);
+    createGameContext(newCode);
   };
 
   const joinGame = () => {
-    setGameCode(code);
-    setPlayerColor(PLAYER_COLORS.RED);
-    navigate(`/game/${code}`);
+    joinGameContext(code);
   };
 
   return (

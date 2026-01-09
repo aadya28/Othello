@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { PLAYER_COLORS, CELL_TYPES, GAME_MODES, SHIFU_COMPLIMENTS, SHIFU_SARCASM, TIMINGS } from '../constants/gameConstants';
-import { getRandomElement } from '../utils/randomHelpers';
+import { GAME_MODES, PLAYER_COLORS, TIMINGS } from '../constants/gameConstants';
 import { displayNotification } from '../utils/notificationHelper';
+import * as shifuAIService from '../services/shifuAI.service';
 
 /**
  * Custom hook for Shifu AI logic
@@ -34,34 +34,22 @@ const useShifuAI = ({
     console.log('User gain:', userGain);
     console.log('Shifu gain:', shifuGain);
     
-    const randomCompliment = getRandomElement(SHIFU_COMPLIMENTS);
-    const randomSarcasm = getRandomElement(SHIFU_SARCASM);
-
-    // Set Shifu's comment based on performance
-    if (shifuGain > userGain) {
-      console.log('Shifu Comment (Shifu gains more pieces):', randomSarcasm);
-      setShifuComment(`😏 ${randomSarcasm}`);
-      displayNotification(randomSarcasm);
-    } else if (userGain > shifuGain) {
-      console.log('Shifu Comment (User gains more pieces):', randomCompliment);
-      setShifuComment(`👏 ${randomCompliment}`);
-      displayNotification(randomCompliment);
-    } else {
-      console.log('Shifu Comment (Tie): Seems like we are evenly matched...');
-      setShifuComment('🤔 Seems like we are evenly matched...');
-      displayNotification('Seems like we are evenly matched...');
-    }
+    // Generate Shifu's comment using service
+    const comment = shifuAIService.generateShifuComment(userGain, shifuGain);
+    console.log(`Shifu Comment (${comment.type}):`, comment.text);
+    setShifuComment(`${comment.emoji} ${comment.text}`);
+    displayNotification(comment.text);
 
     // Clear Shifu's comment after specified time
     setTimeout(() => {
       setShifuComment('');
     }, TIMINGS.SHIFU_COMMENT_DURATION);
 
-    // Calculate valid moves and make a move
-    const validMoves = calculateValidMoves(board, PLAYER_COLORS.RED);
-    if (validMoves.length > 0) {
-      const [row, col] = getRandomElement(validMoves);
-      const newBoard = flipGamePieces(board, row, col, PLAYER_COLORS.RED, CELL_TYPES.REGULAR, shieldedCells);
+    // Calculate AI move using service
+    const move = shifuAIService.calculateAIMove(board, PLAYER_COLORS.RED);
+    
+    if (move) {
+      const newBoard = flipGamePieces(board, move.row, move.col, move.player, move.type, shieldedCells);
       setBoard(newBoard);
       calculatePieceCount(newBoard);
       setCurrentPlayer(PLAYER_COLORS.BLUE);

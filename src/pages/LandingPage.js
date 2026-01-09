@@ -1,28 +1,24 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
-import { PLAYER_COLORS, GAME_MODES } from '../constants/gameConstants';
+import { useGameContext } from '../context/GameContext';
 import { generateGameCode } from '../utils/gameCodeGenerator';
 
-const LandingPage = ({ setGameCode, setPlayerColor }) => {
+const LandingPage = () => {
   const [code, setCode] = useState("");
   const [createdCode, setCreatedCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const navigate = useNavigate();
+  const { createGame: createGameContext, joinGame: joinGameContext, startShifuGame, startGame: startGameContext } = useGameContext();
 
   const createGame = () => {
     const newCode = generateGameCode();
-    setGameCode(newCode);
-    setPlayerColor(PLAYER_COLORS.BLUE);
+    createGameContext(newCode);
     setCreatedCode(newCode);
     setCopied(false);
   };
 
   const joinGame = () => {
     if (code.trim() === "") return;
-    setGameCode(code);
-    setPlayerColor(PLAYER_COLORS.RED);
-    navigate(`/game/${code}`);
+    joinGameContext(code);
   };
 
   const copyToClipboard = () => {
@@ -32,14 +28,11 @@ const LandingPage = ({ setGameCode, setPlayerColor }) => {
   };
 
   const startGame = () => {
-    navigate(`/game/${createdCode}`);
+    startGameContext();
   };
 
   const startGameWithShifu = () => {
-    const gameCode = GAME_MODES.SHIFU;
-    setGameCode(gameCode);
-    setPlayerColor(PLAYER_COLORS.BLUE);
-    navigate(`/game/${gameCode}`);
+    startShifuGame();
   };
 
   return (
