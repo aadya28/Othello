@@ -2,8 +2,8 @@ import React, {useState} from "react";
 import {useNavigate} from 'react-router-dom';
 import "./LandingPage.css";
 import {useGameContext} from '../context/GameContext';
-import {generateGameCode} from '../utils/gameCodeGenerator';
-import {PLAYER_COLORS, GAME_MODES} from '../constants/gameConstants';
+import {generateGameCode} from '../utils/helpers';
+import {PLAYER_COLORS, GAME_MODES, IMAGE_PATHS} from '../constants/gameConstants';
 
 const LandingPage = () => {
     const [code, setCode] = useState("");
@@ -79,7 +79,7 @@ const LandingPage = () => {
             </button>
 
             <button className="shifu-button" onClick={handleStartShifuGame}>
-                <img src={`${process.env.PUBLIC_URL}/images/Shifu.jpg`} alt="Shifu" className="shifu-img"/>
+                <img src={IMAGE_PATHS.SHIFU} alt="Shifu" className="shifu-img"/>
                 Play Against Shifu
             </button>
         </div>

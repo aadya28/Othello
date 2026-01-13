@@ -2,10 +2,9 @@ import React, {useEffect, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import './Board.css';
 import {CELL_TYPES, GAME_MODES, PLAYER_COLORS, TIMINGS} from '../constants/gameConstants';
-import {getRandomElement} from '../utils/randomHelpers';
-import {cloneBoard} from '../utils/boardHelpers';
-import {displayNotification} from '../utils/notificationHelper';
-import useGameState from '../hooks/useGameState';
+import {getRandomElement} from '../utils/helpers';
+import {cloneBoard} from '../services/boardService';
+import useGameStates from '../hooks/useGameStates';
 import useGameLogic from '../hooks/useGameLogic';
 import useGameSocket from '../hooks/useGameSocket';
 import useShifuAI from '../hooks/useShifuAI';
@@ -20,9 +19,9 @@ import Notification from '../components/Notification';
 const Board = () => {
     const {gameCode} = useParams();
     const navigate = useNavigate();
-    const [notificationMessage, setNotificationMessage] = useState(null);
+    const [notification, setNotification] = useState(null);
 
-    const gameState = useGameState();
+    const gameState = useGameStates();
     const {
         board,
         currentPlayer,
@@ -30,8 +29,6 @@ const Board = () => {
         selectedDucky,
         blueCount,
         redCount,
-        prevBlueCount,
-        prevRedCount,
         shieldedCells,
         shieldUsed,
         bombs,
@@ -43,8 +40,6 @@ const Board = () => {
         setCurrentPlayer,
         setValidMoves,
         setSelectedDucky,
-        setPrevBlueCount,
-        setPrevRedCount,
         setShieldedCells,
         setShieldUsed,
         setBombs,
@@ -60,7 +55,7 @@ const Board = () => {
         flipGamePieces,
         checkCanGetShielded,
         verifyGameOver,
-    } = useGameLogic(gameState);
+    } = useGameLogic(gameState, setNotification);
 
     // Socket connection
     const socket = useGameSocket(
@@ -81,8 +76,6 @@ const Board = () => {
         board,
         blueCount,
         redCount,
-        prevBlueCount,
-        prevRedCount,
         shieldedCells,
         setBoard,
         setCurrentPlayer,
@@ -90,6 +83,8 @@ const Board = () => {
         calculatePieceCount,
         calculateValidMoves,
         flipGamePieces,
+        verifyGameOver,
+        onNotification: setNotification,
     });
 
     // Update valid moves when board or player changes
@@ -107,28 +102,24 @@ const Board = () => {
 
         // Check if the cell is already occupied
         if (board[row][col].player !== null) {
-            displayNotification("This cell is already occupied!");
+            setNotification("This cell is already occupied!");
             return;
         }
 
         // Check if it's the current player's turn
         if (currentPlayer !== assignedColor) {
-            displayNotification("It's your opponent's turn!");
+            setNotification("It's your opponent's turn!");
             return;
         }
 
         // Check if the move is valid
         const isValid = validMoves.some(([validRow, validCol]) => validRow === row && validCol === col);
         if (!isValid) {
-            displayNotification("Invalid move!");
+            setNotification("Invalid move!");
             return;
         }
 
         const move = {row, col, player: currentPlayer, type: selectedDucky};
-
-        // Store previous counts before making the move
-        setPrevBlueCount(blueCount);
-        setPrevRedCount(redCount);
 
         // Handle shield placement
         if (selectedDucky === CELL_TYPES.SHIELD) {
@@ -164,7 +155,7 @@ const Board = () => {
         // Handle bomb placement
         if (selectedDucky === CELL_TYPES.BOMB) {
             if (bombs[currentPlayer] !== null) {
-                displayNotification("You can only place one bomb!");
+                setNotification("You can only place one bomb!");
                 return;
             }
 
@@ -187,25 +178,21 @@ const Board = () => {
         setBoard(updatedBoard);
         calculatePieceCount(updatedBoard);
 
-        // Determine piece gains for user and Shifu
-        const userGain = blueCount - prevBlueCount;
-        const shifuGain = redCount - prevRedCount;
-
         // Randomize comments
         const randomCompliment = getRandomElement(['Nice move!', 'Well played!', 'Impressive strategy!']);
         const randomSarcasm = getRandomElement(['Is that all you got?', 'I expected better!', 'Too easy!']);
 
-        // Set Shifu's speech bubble comment (only in Shifu mode)
+        // Set Shifu's speech bubble comment based on who's winning (only in Shifu mode)
         if (gameCode === GAME_MODES.SHIFU) {
-            if (userGain > shifuGain) {
-                console.log('Shifu Comment (user gains more pieces):', randomCompliment);
+            if (blueCount > redCount) {
+                console.log('Shifu Comment (user is winning):', randomCompliment);
                 setShifuComment(`👏 ${randomCompliment}`);
-            } else if (shifuGain > userGain) {
-                console.log('Shifu Comment (Shifu gains more pieces):', randomSarcasm);
+            } else if (redCount > blueCount) {
+                console.log('Shifu Comment (Shifu is winning):', randomSarcasm);
                 setShifuComment(`😏 ${randomSarcasm}`);
             } else {
-                console.log('Shifu Comment (Tie): A tie? Is that all you got?');
-                setShifuComment('🤔 A tie? Is that all you got?');
+                console.log('Shifu Comment (Tie): A tie? Let\'s see if you can break it!');
+                setShifuComment('🤔 A tie? Let\'s see if you can break it!');
             }
 
             // Clear the comment after specified time
@@ -214,13 +201,26 @@ const Board = () => {
             }, TIMINGS.SHIFU_COMMENT_DURATION);
         }
 
+        // Check if game is over after the move
+        verifyGameOver(updatedBoard);
+
         // Determine the next player and set valid moves
         const nextPlayer = currentPlayer === PLAYER_COLORS.BLUE ? PLAYER_COLORS.RED : PLAYER_COLORS.BLUE;
         const nextValidMoves = calculateValidMoves(updatedBoard, nextPlayer);
+        
         if (nextValidMoves.length > 0) {
+            // Next player has moves, switch turn
             setCurrentPlayer(nextPlayer);
         } else {
-            displayNotification(`${nextPlayer === PLAYER_COLORS.BLUE ? 'Blue' : 'Red'} has no valid moves, your turn again!`);
+            // Next player has no moves - check if current player can continue
+            const currentPlayerValidMoves = calculateValidMoves(updatedBoard, currentPlayer);
+            
+            if (currentPlayerValidMoves.length > 0) {
+                // Current player can continue, keep the turn
+                setNotification(`${nextPlayer === PLAYER_COLORS.BLUE ? 'Blue' : 'Red'} has no valid moves, your turn again!`);
+            } else {
+                // Neither player has moves - game over (verifyGameOver already called above)
+            }
         }
 
         // Emit the move to the server
@@ -278,12 +278,12 @@ const Board = () => {
                 onSelect={setSelectedDucky}
                 assignedColor={assignedColor}
                 shieldUsed={shieldUsed}
+                onNotification={setNotification}
             />
 
             {/* Notification */}
             <Notification
-                message={notificationMessage}
-                onClose={() => setNotificationMessage(null)}
+                message={notification}
             />
         </div>
     );

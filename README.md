@@ -31,7 +31,7 @@ This fork includes significant improvements to the codebase:
   - Separated concerns with `hooks/`, `services/`, `context/`, `constants/`, and `utils/` directories
   - Split large components into smaller, maintainable pieces
 - **Extracted Business Logic**: Game logic moved to reusable service files
-- **Custom React Hooks**: Created `useGameState`, `useGameLogic`, `useGameSocket`, and `useShifuAI`
+- **Custom React Hooks**: Created `useGameStates`, `useGameLogic`, `useGameSocket`, and `useShifuAI`
 - **Constants & Configuration**: Eliminated magic numbers and hardcoded values
 - **Context API Integration**: Removed prop drilling with centralized state management
 - **Code Consistency**: Applied React best practices and consistent naming conventions

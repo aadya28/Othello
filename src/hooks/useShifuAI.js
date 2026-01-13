@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { GAME_MODES, PLAYER_COLORS, TIMINGS } from '../constants/gameConstants';
-import { displayNotification } from '../utils/notificationHelper';
-import * as shifuAIService from '../services/shifuAI.service';
+import * as shifuAIService from '../services/shifuAIService';
 
 /**
  * Custom hook for Shifu AI logic
@@ -14,8 +13,6 @@ const useShifuAI = ({
   board,
   blueCount,
   redCount,
-  prevBlueCount,
-  prevRedCount,
   shieldedCells,
   setBoard,
   setCurrentPlayer,
@@ -23,28 +20,13 @@ const useShifuAI = ({
   calculatePieceCount,
   calculateValidMoves,
   flipGamePieces,
+  verifyGameOver,
+  onNotification,
 }) => {
   /**
    * Execute computer move for Shifu AI
    */
-  const executeComputerMove = () => {
-    const userGain = blueCount - prevBlueCount;
-    const shifuGain = redCount - prevRedCount;
-
-    console.log('User gain:', userGain);
-    console.log('Shifu gain:', shifuGain);
-    
-    // Generate Shifu's comment using service
-    const comment = shifuAIService.generateShifuComment(userGain, shifuGain);
-    console.log(`Shifu Comment (${comment.type}):`, comment.text);
-    setShifuComment(`${comment.emoji} ${comment.text}`);
-    displayNotification(comment.text);
-
-    // Clear Shifu's comment after specified time
-    setTimeout(() => {
-      setShifuComment('');
-    }, TIMINGS.SHIFU_COMMENT_DURATION);
-
+  const executeComputerMove = useCallback(() => {
     // Calculate AI move using service
     const move = shifuAIService.calculateAIMove(board, PLAYER_COLORS.RED);
     
@@ -52,13 +34,35 @@ const useShifuAI = ({
       const newBoard = flipGamePieces(board, move.row, move.col, move.player, move.type, shieldedCells);
       setBoard(newBoard);
       calculatePieceCount(newBoard);
+      
+      // Check if game is over after Shifu's move
+      verifyGameOver(newBoard);
+      
+      // Generate Shifu's comment based on who's winning
+      const comment = shifuAIService.generateShifuComment(blueCount, redCount);
+      setShifuComment(`${comment.emoji} ${comment.text}`);
+      onNotification(comment.text);
+
+      // Clear Shifu's comment after specified time
+      setTimeout(() => {
+        setShifuComment('');
+      }, TIMINGS.SHIFU_COMMENT_DURATION);
+      
       setCurrentPlayer(PLAYER_COLORS.BLUE);
     } else {
-      // No valid moves for computer, pass turn back to player
-      setCurrentPlayer(PLAYER_COLORS.BLUE);
-      displayNotification("Computer has no valid moves, your turn again!");
+      // No valid moves for Shifu - check if game is over or pass turn
+      const blueValidMoves = calculateValidMoves(board, PLAYER_COLORS.BLUE);
+      
+      if (blueValidMoves.length > 0) {
+        // User still has moves, pass turn back
+        setCurrentPlayer(PLAYER_COLORS.BLUE);
+        onNotification("Computer has no valid moves, your turn again!");
+      } else {
+        // Neither player has moves - game over
+        verifyGameOver(board);
+      }
     }
-  };
+  }, [board, blueCount, redCount, shieldedCells, calculatePieceCount, calculateValidMoves, flipGamePieces, verifyGameOver, setBoard, setCurrentPlayer, setShifuComment, onNotification]);
 
   // Trigger Shifu move when it's the computer's turn
   useEffect(() => {
@@ -66,8 +70,7 @@ const useShifuAI = ({
       const timeoutId = setTimeout(executeComputerMove, TIMINGS.COMPUTER_MOVE_DELAY);
       return () => clearTimeout(timeoutId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPlayer, gameCode]);
+  }, [currentPlayer, gameCode, executeComputerMove]);
 
   return {
     executeComputerMove,

@@ -7,17 +7,15 @@ import { IMAGE_PATHS } from '../constants/gameConstants';
  */
 const ShifuDisplay = ({ comment }) => {
   return (
-    <div className="shifu-center-container">
-      <div className="shifu-container">
-        <img
-          className="shifu-img"
-          src={IMAGE_PATHS.SHIFU}
-          alt="Shifu Opponent"
-        />
-        <p className="shifu-label">Shifu Opponent</p>
-        <div className={`shifu-speech-bubble ${comment ? 'visible' : 'hidden'}`}>
-          <p>{comment}</p>
-        </div>
+    <div className="shifu-container">
+      <img
+        className="shifu-img"
+        src={IMAGE_PATHS.SHIFU}
+        alt="Shifu Opponent"
+      />
+      <p className="shifu-label">Shifu Opponent</p>
+      <div className={`shifu-speech-bubble ${comment ? 'visible' : 'hidden'}`}>
+        <p>{comment}</p>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 const http = require("http");
 const express = require("express");
-const { Server } = require("socket.io");
+const {Server} = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,15 +14,17 @@ const io = new Server(server, {
 app.use(express.static("public"));
 
 const createNewBoard = () => {
-    return Array(8).fill(null).map(() => Array(8).fill({ type: 'empty', player: null }));
+    return Array(8).fill(null).map(() =>
+        Array(8).fill(null).map(() => ({type: 'empty', player: null}))
+    );
 };
 
 const getInitialBoard = () => {
     const board = createNewBoard();
-    board[3][3] = { type: 'regular', player: 'R' };
-    board[3][4] = { type: 'regular', player: 'B' };
-    board[4][3] = { type: 'regular', player: 'B' };
-    board[4][4] = { type: 'regular', player: 'R' };
+    board[3][3] = {type: 'regular', player: 'R'};
+    board[3][4] = {type: 'regular', player: 'B'};
+    board[4][3] = {type: 'regular', player: 'B'};
+    board[4][4] = {type: 'regular', player: 'R'};
     return board;
 };
 
@@ -82,12 +84,12 @@ const flipPieces = (board, row, col, player, type, shieldedCells) => {
 
         if (piecesToFlip.length > 0 && x >= 0 && x < 8 && y >= 0 && y < 8 && board[x][y].player === player) {
             piecesToFlip.forEach(([fx, fy]) => {
-                newBoard[fx][fy] = { type: board[fx][fy].type, player };
+                newBoard[fx][fy] = {type: board[fx][fy].type, player};
             });
         }
     });
 
-    newBoard[row][col] = { type, player };
+    newBoard[row][col] = {type, player};
     return newBoard;
 };
 
@@ -103,25 +105,10 @@ const calculateValidMoves = (board, player) => {
     return moves; // Return the array of valid moves
 };
 
-const makeComputerMove = (game) => {
-    const validMoves = calculateValidMoves(game.board, 'R');
-    if (validMoves.length > 0) {
-        const [row, col] = validMoves[Math.floor(Math.random() * validMoves.length)];
-        game.board = flipPieces(game.board, row, col, 'R', 'regular', game.shieldedCells);
-        game.currentPlayer = 'B';
-        io.to(game.gameCode).emit('gameState', game); // Emit game state after computer move
-    } else {
-        // No valid moves for computer, pass turn back to player
-        game.currentPlayer = 'B';
-        io.to(game.gameCode).emit('gameState', game);
-        io.to(game.gameCode).emit('notification', "Computer has no valid moves, your turn again!");
-    }
-};
-
 io.on("connection", (socket) => {
     console.log(`✅ A user connected: ${socket.id}`);
 
-    socket.on('joinGame', ({ gameCode }) => {
+    socket.on('joinGame', ({gameCode}) => {
         console.log(`User ${socket.id} requested to join game ${gameCode}`);
         socket.join(gameCode);
 
@@ -130,7 +117,7 @@ io.on("connection", (socket) => {
                 board: getInitialBoard(),
                 currentPlayer: 'B',
                 players: {},
-                shieldedCells: { B: [], R: [] },
+                shieldedCells: {B: [], R: []},
                 gameCode
             };
         }
@@ -165,12 +152,12 @@ io.on("connection", (socket) => {
         io.to(gameCode).emit('gameState', game);
     });
 
-    socket.on('makeMove', ({ gameCode, move }) => {
+    socket.on('makeMove', ({gameCode, move}) => {
         console.log(`Move made in game ${gameCode}:`, move);
         const game = games[gameCode];
         if (!game) return;
 
-        const { row, col, player, type } = move;
+        const {row, col, player, type} = move;
 
         // Validate turn
         if (game.currentPlayer !== player) {

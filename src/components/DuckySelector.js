@@ -1,6 +1,5 @@
 import React from 'react';
 import { CELL_TYPES, PLAYER_COLORS, IMAGE_PATHS } from '../constants/gameConstants';
-import { displayNotification } from '../utils/notificationHelper';
 
 /**
  * DuckySelector Component - Allows player to select ducky type
@@ -8,11 +7,12 @@ import { displayNotification } from '../utils/notificationHelper';
  * @param {Function} onSelect - Callback when ducky is selected
  * @param {string} assignedColor - Player's color
  * @param {Object} shieldUsed - Object tracking shield usage per player
+ * @param {Function} onNotification - Callback to display notifications
  */
-const DuckySelector = ({ selectedDucky, onSelect, assignedColor, shieldUsed }) => {
+const DuckySelector = ({ selectedDucky, onSelect, assignedColor, shieldUsed, onNotification }) => {
   const handleShieldClick = () => {
     if (shieldUsed[assignedColor]) {
-      displayNotification('You can only use the shield once!');
+      onNotification('You can only use the shield once!');
     } else {
       onSelect(CELL_TYPES.SHIELD);
     }

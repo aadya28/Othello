@@ -7,20 +7,14 @@ import React from 'react';
  */
 const TopNavigation = ({ onHome, onRestart }) => {
   return (
-    <>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/icon?family=Material+Icons"
-      />
-      <div className="top-buttons">
-        <button className="icon-button" title="Home" onClick={onHome}>
-          <span className="material-icons">home</span>
-        </button>
-        <button className="icon-button" title="Restart" onClick={onRestart}>
-          <span className="material-icons">restart_alt</span>
-        </button>
-      </div>
-    </>
+    <div className="top-buttons">
+      <button className="icon-button" title="Home" onClick={onHome}>
+        <span className="material-icons">home</span>
+      </button>
+      <button className="icon-button" title="Restart" onClick={onRestart}>
+        <span className="material-icons">restart_alt</span>
+      </button>
+    </div>
   );
 };
 

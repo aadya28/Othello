@@ -71,7 +71,7 @@ export const IMAGE_PATHS = {
   RED_SHIELD: '/images/red_shield_duckie.png',
   BLUE_BOMB: '/images/blue_bomb_duckie.png',
   RED_BOMB: '/images/red_bomb_duckie.png',
-  SHIFU: `${process.env.PUBLIC_URL}/images/Shifu.jpg`,
+  SHIFU: `${process.env.PUBLIC_URL}/images/shifu.jpg`,
 };
 
 // Game code generation settings
@@ -88,8 +88,8 @@ export const NOTIFICATION = {
 
 // Timings
 export const TIMINGS = {
-  COMPUTER_MOVE_DELAY: 1000,
-  SHIFU_COMMENT_DURATION: 5000,
+  COMPUTER_MOVE_DELAY: 700,
+  SHIFU_COMMENT_DURATION: 3000,
 };
 
 // Server configuration

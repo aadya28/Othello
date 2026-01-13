@@ -8,24 +8,22 @@ import { IMAGE_PATHS } from '../constants/gameConstants';
  */
 const PieceCounter = ({ blueCount, redCount }) => {
   return (
-    <div className="piece-count-container">
-      <div className="piece-count">
-        <div>
-          <img
-            className="duckie-img"
-            src={IMAGE_PATHS.BLUE_DUCKIE}
-            alt="Blue Ducky"
-          />
-          : {blueCount}
-        </div>
-        <div>
-          <img
-            className="duckie-img"
-            src={IMAGE_PATHS.RED_DUCKIE}
-            alt="Red Ducky"
-          />
-          : {redCount}
-        </div>
+    <div className="piece-count">
+      <div>
+        <img
+          className="duckie-img"
+          src={IMAGE_PATHS.BLUE_DUCKIE}
+          alt="Blue Ducky"
+        />
+        : {blueCount}
+      </div>
+      <div>
+        <img
+          className="duckie-img"
+          src={IMAGE_PATHS.RED_DUCKIE}
+          alt="Red Ducky"
+        />
+        : {redCount}
       </div>
     </div>
   );

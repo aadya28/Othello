@@ -29,15 +29,6 @@ export const GameProvider = ({children}) => {
     const [gameCode, setGameCode] = useState('');
     const [playerColor, setPlayerColor] = useState('');
 
-    /**
-     * Reset game state to initial values
-     * Convenience function for resetting multiple state values at once
-     */
-    const resetGame = () => {
-        setGameCode('');
-        setPlayerColor('');
-    };
-
     const value = {
         // State
         gameCode,
@@ -46,9 +37,6 @@ export const GameProvider = ({children}) => {
         // Setters
         setGameCode,
         setPlayerColor,
-
-        // Helper
-        resetGame,
     };
 
     return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

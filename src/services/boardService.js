@@ -4,7 +4,15 @@
  */
 
 import { BOARD_SIZE, PLAYER_COLORS, DIRECTIONS } from '../constants/gameConstants';
-import { cloneBoard } from '../utils/boardHelpers';
+
+/**
+ * Create a deep clone of the game board
+ * @param {Array<Array>} board - 2D array representing the game board
+ * @returns {Array<Array>} Cloned board
+ */
+export const cloneBoard = (board) => {
+  return board.map(row => row.slice());
+};
 
 /**
  * Calculate piece counts for both players
@@ -133,17 +141,25 @@ export const flipPieces = (board, row, col, player, type, shieldedCells) => {
 };
 
 /**
- * Check if the game is over (board is full)
+ * Check if the game is over
+ * Game ends when: board is full OR both players have no valid moves
  * @param {Array<Array>} board - The game board
  * @returns {Object} Object with isGameOver flag and winner (if any)
  */
 export const checkGameOver = (board) => {
   const isBoardFull = board.every(row => row.every(cell => cell.player !== null));
   
-  if (!isBoardFull) {
+  // Check if both players have valid moves
+  const blueValidMoves = getValidMoves(board, PLAYER_COLORS.BLUE);
+  const redValidMoves = getValidMoves(board, PLAYER_COLORS.RED);
+  const bothPlayersNoMoves = blueValidMoves.length === 0 && redValidMoves.length === 0;
+  
+  // Game continues if board not full AND at least one player has moves
+  if (!isBoardFull && !bothPlayersNoMoves) {
     return { isGameOver: false, winner: null };
   }
 
+  // Game is over - determine winner
   const { blue, red } = calculatePieceCount(board);
   
   let winner;

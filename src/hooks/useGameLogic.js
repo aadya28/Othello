@@ -1,21 +1,17 @@
 import { useCallback } from 'react';
-import { displayNotification } from '../utils/notificationHelper';
 import * as boardService from '../services/boardService';
 
 /**
  * Custom hook for game logic and rules
  * @param {Object} gameState - Current game state
+ * @param {Function} onNotification - Callback to display notifications
  * @returns {Object} Game logic functions
  */
-const useGameLogic = (gameState) => {
+const useGameLogic = (gameState, onNotification) => {
   const { 
-    board, 
-    blueCount, 
-    redCount, 
+    board,
     setBlueCount, 
-    setRedCount, 
-    setPrevBlueCount, 
-    setPrevRedCount,
+    setRedCount,
     setGameOver,
     setWinner
   } = gameState;
@@ -25,11 +21,9 @@ const useGameLogic = (gameState) => {
    */
   const calculatePieceCount = useCallback((boardToCount) => {
     const { blue, red } = boardService.calculatePieceCount(boardToCount);
-    setPrevBlueCount(blueCount);
-    setPrevRedCount(redCount);
     setBlueCount(blue);
     setRedCount(red);
-  }, [blueCount, redCount, setBlueCount, setRedCount, setPrevBlueCount, setPrevRedCount]);
+  }, [setBlueCount, setRedCount]);
 
   /**
    * Check if a move is valid
@@ -58,11 +52,11 @@ const useGameLogic = (gameState) => {
   const checkCanGetShielded = useCallback((player, shieldedCells, row, col) => {
     const result = boardService.canShieldCell(board, row, col, player);
     if (!result.isValid) {
-      displayNotification(result.error);
+      onNotification(result.error);
       return false;
     }
     return true;
-  }, [board]);
+  }, [board, onNotification]);
 
   /**
    * Verify if the game is over
