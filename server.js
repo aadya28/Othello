@@ -17,7 +17,7 @@ const io = new Server(server, {
     cors: {
         origin: [
             'http://localhost:3000',
-            'https://othelloduckgame.vercel.app/'
+            'https://othelloduckgame.vercel.app'
         ],
         methods: ["GET", "POST"]
     }
