@@ -1,195 +1,149 @@
-import {useEffect, useRef} from 'react';
+import { useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import {SERVER_CONFIG, GAME_MODES, PLAYER_COLORS} from '../constants/gameConstants';
+import { SERVER_CONFIG, GAME_MODES, PLAYER_COLORS, CELL_TYPES } from '../constants/gameConstants';
 
 /**
- * Custom React hook for managing Socket.io connection and real-time game events.
- *
- * This hook handles:
- * - Establishing and maintaining a WebSocket connection to the game server
- * - Joining game rooms based on game code
- * - Listening for game state updates from the server
- * - Automatic cleanup on component unmount
- *
- * @param {string} gameCode - Unique identifier for the game room to join
- * @param {Function} setAssignedColor - State setter for the player's assigned color ('B' or 'R')
- * @param {Function} setBoard - State setter for the game board (8x8 array)
- * @param {Function} setCurrentPlayer - State setter for whose turn it is
- * @param {Function} setShieldedCells - State setter for cells protected by shields
- * @param {Function} calculatePieceCount - Function to calculate piece counts for both players
- * @param {Function} calculateValidMoves - Function to determine valid moves for current player
- * @param {Function} setValidMoves - State setter for array of valid move coordinates
- *
- * @returns {Socket|null} Socket.io client instance (or null if not yet initialized)
+ * Custom hook to manage Socket.IO connection and real-time multiplayer events
+ * 
+ * Architecture:
+ * - Effect 1: Creates socket connection once on mount, handles connect/disconnect/error events
+ * - Effect 2: Joins game room and registers game-specific listeners when gameCode changes
+ * 
+ * @param {string} gameCode - The game room code to join
+ * @param {Object} callbacks - Object containing all state setter functions
+ * @param {Function} callbacks.setAssignedColor - Set player's color (Blue/Red)
+ * @param {Function} callbacks.setBoard - Update board state
+ * @param {Function} callbacks.setCurrentPlayer - Update current player turn
+ * @param {Function} callbacks.setShieldedCells - Update shielded cells
+ * @param {Function} callbacks.setValidMoves - Update valid moves array
+ * @param {Function} callbacks.setBlueCount - Update blue piece count
+ * @param {Function} callbacks.setRedCount - Update red piece count
+ * @param {Function} callbacks.setGameOver - Update game over state
+ * @param {Function} callbacks.setWinner - Update winner state
+ * @param {Function} callbacks.setNotification - Display notification messages (optional)
+ * @param {Function} callbacks.setShifuComment - Display Shifu AI comments (optional)
+ * @param {Function} callbacks.setSelectedDucky - Reset selected ducky type (optional)
+ * @returns {Object} Socket.IO client instance
  */
 const useGameSocket = (
     gameCode,
-    setAssignedColor,
-    setBoard,
-    setCurrentPlayer,
-    setShieldedCells,
-    calculatePieceCount,
-    calculateValidMoves,
-    setValidMoves
-) => {
+    {
+        setAssignedColor,
+        setBoard,
+        setCurrentPlayer,
+        setShieldedCells,
+        setShieldUsed,
+        setValidMoves,
+        setBlueCount,
+        setRedCount,
+        setGameOver,
+        setWinner,
+        setNotification,
+        setShifuComment,
+        setSelectedDucky
+    }
+)  => {
     const socketRef = useRef(null);
 
-    // Store callbacks in a ref to prevent triggering effects when they change
-    const callbacksRef = useRef({
-        setAssignedColor,
-        setBoard,
-        setCurrentPlayer,
-        setShieldedCells,
-        calculatePieceCount,
-        calculateValidMoves,
-        setValidMoves
-    });
-
-    // Update callbacks ref whenever any callback changes
+    // Initialize socket (once)
     useEffect(() => {
-        callbacksRef.current = {
-            setAssignedColor,
-            setBoard,
-            setCurrentPlayer,
-            setShieldedCells,
-            calculatePieceCount,
-            calculateValidMoves,
-            setValidMoves
-        };
-    }, [
-        setAssignedColor,
-        setBoard,
-        setCurrentPlayer,
-        setShieldedCells,
-        calculatePieceCount,
-        calculateValidMoves,
-        setValidMoves
-    ]);
+        if (socketRef.current) return;
 
-    // Effect 1: Initialize socket connection once on component mount
-    useEffect(() => {
-        // Only create socket if it doesn't exist
-        if (!socketRef.current) {
-            console.log('Initializing socket connection...');
+        const socket = io(SERVER_CONFIG.URL, {
+            reconnection: SERVER_CONFIG.RECONNECTION,
+            reconnectionDelay: SERVER_CONFIG.RECONNECTION_DELAY,
+            reconnectionDelayMax: SERVER_CONFIG.RECONNECTION_DELAY_MAX,
+            reconnectionAttempts: SERVER_CONFIG.RECONNECTION_ATTEMPTS,
+        });
 
-            const socket = io(SERVER_CONFIG.URL, {
-                reconnection: SERVER_CONFIG.RECONNECTION,
-                reconnectionDelay: SERVER_CONFIG.RECONNECTION_DELAY,
-                reconnectionDelayMax: SERVER_CONFIG.RECONNECTION_DELAY_MAX,
-                reconnectionAttempts: SERVER_CONFIG.RECONNECTION_ATTEMPTS,
-            });
+        socket.on('connect', () => {
+            console.log('✅ Connected:', socket.id);
+        });
 
-            // Connection lifecycle events
-            socket.on('connect', () => {
-                console.log('✅ Connected to server. Socket ID:', socket.id);
-            });
+        socket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected:', reason);
+        });
 
-            socket.on('disconnect', (reason) => {
-                console.log('❌ Disconnected from server. Reason:', reason);
-            });
+        socket.on('error', (message) => {
+            console.error('❌ Server error:', message);
+            setNotification?.(message);
+        });
 
-            socket.on('connect_error', (error) => {
-                console.error('❌ Connection error:', error.message);
-            });
+        socketRef.current = socket;
 
-            // Handle server errors
-            socket.on('error', (errorMessage) => {
-                console.error('❌ Server error:', errorMessage);
-                // TODO: Show error notification to user
-            });
-
-            socketRef.current = socket;
-        }
-
-        // Cleanup: Disconnect socket when component unmounts
         return () => {
-            if (socketRef.current) {
-                console.log('Disconnecting socket...');
-                socketRef.current.disconnect();
-                socketRef.current = null;
-            }
+            socket.disconnect();
+            socketRef.current = null;
         };
-    }, []); // Runs only once on mount
+    }, [setNotification]);
 
-    // Effect 2: Join game room and set up game-specific event listeners
-    // Re-runs when gameCode changes (e.g., user switches to a different game)
+    // Join game & listen to events
     useEffect(() => {
         const socket = socketRef.current;
+        if (!socket || !gameCode) return;
 
-        // Wait for socket to be initialized
-        if (!socket) return;
-
-        console.log(`Joining game room: ${gameCode}`);
-
-        // Join the game room on the server
         const joinGame = () => {
-            socket.emit('joinGame', {gameCode});
+            socket.emit('joinGame', { gameCode });
         };
 
-        // Emit joinGame immediately if already connected, otherwise wait for connection
-        if (socket.connected) {
-            joinGame();
-        } else {
-            socket.once('connect', joinGame);
-        }
+        socket.connected ? joinGame() : socket.once('connect', joinGame);
 
-        // Special case: Shifu mode (single-player vs computer)
-        // Player is always Blue, computer is Red
+        // Shifu mode: player is always Blue
         if (gameCode === GAME_MODES.SHIFU) {
-            callbacksRef.current.setAssignedColor(PLAYER_COLORS.BLUE);
+            setAssignedColor(PLAYER_COLORS.BLUE);
         }
 
-        // Event handler: Server sends updated shield positions
-        const handleShieldsUpdated = (shields) => {
-            console.log('Shields updated:', shields);
-            callbacksRef.current.setShieldedCells(shields);
-        };
+        //Game state update (authoritative)
+        socket.on('gameState', (state) => {
+            setBoard(state.board);
+            setCurrentPlayer(state.currentPlayer);
+            setShieldedCells(state.shieldedCells);
+            setShieldUsed(state.shieldUsed);
+            setValidMoves(state.validMoves);
+            setBlueCount(state.blueCount);
+            setRedCount(state.redCount);
+        });
+        
+        // Game over event (separate from gameState)
+        socket.on('gameOver', ({ winner }) => {
+            setGameOver(true);
+            setWinner(winner);
+        });
+        
+        // Game restarted event - reset client UI state
+        socket.on('gameRestarted', () => {
+            setGameOver(false);
+            setWinner(null);
+            setShifuComment?.('');
+            setSelectedDucky?.(CELL_TYPES.REGULAR);
+        });
 
-        // Event handler: Server assigns color to player (multiplayer mode)
-        const handleAssignedColor = (color) => {
-            console.log(`Assigned color: ${color === 'B' ? 'Blue' : 'Red'}`);
-            callbacksRef.current.setAssignedColor(color);
-        };
+        // Assigned color (multiplayer)
+        socket.on('assignedColor', setAssignedColor);
 
-        // Event handler: Server broadcasts updated game state (after any move)
-        const handleGameState = (gameState) => {
-            console.log('Game state updated:', gameState);
+        // Shield updates (optional separate emit)
+        socket.on('shieldsUpdated', setShieldedCells);
 
-            // Update all game state
-            callbacksRef.current.setBoard(gameState.board);
-            callbacksRef.current.setCurrentPlayer(gameState.currentPlayer);
-            callbacksRef.current.setShieldedCells(gameState.shieldedCells || {B: [], R: []});
-            callbacksRef.current.calculatePieceCount(gameState.board);
+        // System notifications
+        socket.on('notification', (message) => {
+            setNotification?.(message);
+        });
 
-            // Calculate and update valid moves for the current player
-            const validMoves = callbacksRef.current.calculateValidMoves(
-                gameState.board,
-                gameState.currentPlayer
-            );
-            callbacksRef.current.setValidMoves(validMoves);
-        };
+        // Shifu AI comment (separate UI)
+        socket.on('shifuComment', (comment) => {
+            setShifuComment?.(comment);
+        });
 
-        // Event handler: Server sends notification messages
-        const handleNotification = (message) => {
-            console.log('Notification:', message);
-            // TODO: Display notification to user (toast, alert, etc.)
-        };
-
-        // Register all event listeners
-        socket.on('shieldsUpdated', handleShieldsUpdated);
-        socket.on('assignedColor', handleAssignedColor);
-        socket.on('gameState', handleGameState);
-        socket.on('notification', handleNotification);
-
-        // Cleanup: Remove event listeners when gameCode changes or component unmounts
         return () => {
-            console.log(`Cleaning up listeners for game room: ${gameCode}`);
-            socket.off('shieldsUpdated', handleShieldsUpdated);
-            socket.off('assignedColor', handleAssignedColor);
-            socket.off('gameState', handleGameState);
-            socket.off('notification', handleNotification);
+            socket.off('gameState');
+            socket.off('gameOver');
+            socket.off('gameRestarted');
+            socket.off('assignedColor');
+            socket.off('shieldsUpdated');
+            socket.off('notification');
+            socket.off('shifuComment');
         };
-    }, [gameCode]); // Only re-run when gameCode changes
+    }, [gameCode]);
 
     return socketRef.current;
 };

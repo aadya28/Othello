@@ -2,7 +2,6 @@ import React, {useState} from "react";
 import {useNavigate} from 'react-router-dom';
 import "./LandingPage.css";
 import {useGameContext} from '../context/GameContext';
-import {generateGameCode} from '../utils/helpers';
 import {PLAYER_COLORS, GAME_MODES, IMAGE_PATHS} from '../constants/gameConstants';
 
 const LandingPage = () => {
@@ -11,6 +10,14 @@ const LandingPage = () => {
     const [copied, setCopied] = useState(false);
     const {gameCode, setGameCode, setPlayerColor} = useGameContext();
     const navigate = useNavigate();
+
+    const generateGameCode = (length = 6) => {
+        const radix = 36; // Base-36 (0-9, a-z)
+        return Math.random()
+            .toString(radix)
+            .substring(2, 2 + length)
+            .toUpperCase();
+    };
 
     const handleCreateGame = () => {
         const newCode = generateGameCode();

@@ -1,216 +1,406 @@
-const http = require("http");
 const express = require("express");
+const http = require("http");
 const {Server} = require("socket.io");
+const {
+    createInitialBoard,
+    getValidMoves,
+    flipPieces,
+    calculatePieceCount,
+    checkGameOver
+} = require("./server/services/boardService.js");
+const {calculateAIMove, generateShifuComment} = require("./server/services/shifuAIService");
+const {PLAYER_COLORS, GAME_MODES} = require("./server/constants/gameConstants.js");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: [
+            'http://localhost:3000',
+            'https://othelloduckgame.vercel.app/'
+        ],
         methods: ["GET", "POST"]
     }
 });
 
 app.use(express.static("public"));
 
-const createNewBoard = () => {
-    return Array(8).fill(null).map(() =>
-        Array(8).fill(null).map(() => ({type: 'empty', player: null}))
+// Store all active games
+const games = new Map();
+
+/**
+ * Create new game state
+ */
+const createGameState = () => ({
+    board: createInitialBoard(),
+    currentPlayer: PLAYER_COLORS.BLUE,
+    shieldedCells: {
+        [PLAYER_COLORS.BLUE]: [],
+        [PLAYER_COLORS.RED]: [],
+    },
+    shieldUsed: {
+        [PLAYER_COLORS.BLUE]: false,
+        [PLAYER_COLORS.RED]: false,
+    },
+    players: {},
+});
+
+/**
+ * Core move logic - used by both human players and AI
+ * This is the single source of truth for making moves
+ */
+const applyMove = (game, player, row, col, type) => {
+    // Validate the move is legal
+    const validMoves = getValidMoves(game.board, player);
+    const isValid = validMoves.some(([r, c]) => r === row && c === col);
+
+    if (!isValid) {
+        return {success: false, error: "Invalid move"};
+    }
+
+    // Handle shield placement
+    if (type === 'shield') {
+        if (game.shieldUsed[player]) {
+            return {success: false, error: "Shield already used"};
+        }
+        game.shieldedCells[player].push([row, col]);
+        game.shieldUsed[player] = true;
+        console.log(`🛡️ Shield placed by ${player} at [${row}, ${col}]`);
+    }
+
+    // Execute the move and flip pieces
+    game.board = flipPieces(
+        game.board,
+        row,
+        col,
+        player,
+        type,
+        game.shieldedCells
     );
+
+    console.log(`✅ Move executed by ${player} at [${row}, ${col}]`);
+
+    // Determine next player
+    const opponent = player === PLAYER_COLORS.BLUE
+        ? PLAYER_COLORS.RED
+        : PLAYER_COLORS.BLUE;
+
+    const opponentMoves = getValidMoves(game.board, opponent);
+
+    if (opponentMoves.length > 0) {
+        // Opponent has valid moves, switch turn
+        game.currentPlayer = opponent;
+        return {
+            success: true,
+            nextPlayer: opponent,
+            noMovesForOpponent: false
+        };
+    } else {
+        // Opponent has no valid moves, current player continues
+        game.currentPlayer = player;
+        const opponentName = opponent === PLAYER_COLORS.BLUE ? 'Blue' : 'Red';
+        console.log(`⚠️ ${opponentName} has no valid moves`);
+        return {
+            success: true,
+            nextPlayer: player,
+            noMovesForOpponent: true,
+            opponentName
+        };
+    }
 };
 
-const getInitialBoard = () => {
-    const board = createNewBoard();
-    board[3][3] = {type: 'regular', player: 'R'};
-    board[3][4] = {type: 'regular', player: 'B'};
-    board[4][3] = {type: 'regular', player: 'B'};
-    board[4][4] = {type: 'regular', player: 'R'};
-    return board;
+/**
+ * Check if game is over and emit if so
+ */
+const checkAndEmitGameOver = (gameCode) => {
+    const game = games.get(gameCode);
+    if (!game) return false;
+
+    const {isGameOver, winner} = checkGameOver(game.board);
+    if (isGameOver) {
+        io.to(gameCode).emit("gameOver", {winner});
+        console.log(`Game ${gameCode} ended. Winner: ${winner}`);
+        return true;
+    }
+    return false;
 };
 
-const games = {};
+/**
+ * Emit full game state to all players in the room
+ */
+const emitGameState = (gameCode) => {
+    const game = games.get(gameCode);
+    if (!game) return;
 
-const directions = [
-    [0, 1], [1, 0], [0, -1], [-1, 0],
-    [-1, -1], [-1, 1], [1, -1], [1, 1]
-];
+    const pieceCount = calculatePieceCount(game.board);
+    const validMovesBlue = getValidMoves(game.board, PLAYER_COLORS.BLUE);
+    const validMovesRed = getValidMoves(game.board, PLAYER_COLORS.RED);
 
-const isValidMove = (board, row, col, player, type) => {
-    if (board[row][col].player !== null) return false; // Cell must be empty
-    const opponent = player === 'B' ? 'R' : 'B';
-    let valid = false;
+    // Send valid moves for the current player
+    const validMoves = game.currentPlayer === PLAYER_COLORS.BLUE
+        ? validMovesBlue
+        : validMovesRed;
 
-    directions.forEach(([dx, dy]) => {
-        let x = row + dx;
-        let y = col + dy;
-        let hasOpponentBetween = false;
+    io.to(gameCode).emit("gameState", {
+        board: game.board,
+        currentPlayer: game.currentPlayer,
+        shieldedCells: game.shieldedCells,
+        shieldUsed: game.shieldUsed,
+        validMoves: validMoves,
+        blueCount: pieceCount.blue,
+        redCount: pieceCount.red,
+    });
+};
 
-        while (x >= 0 && x < 8 && y >= 0 && y < 8 && board[x][y].player === opponent) {
-            hasOpponentBetween = true;
-            x += dx;
-            y += dy;
+/**
+ * Execute computer move for Shifu mode
+ * Uses the same applyMove logic as human players
+ */
+const makeComputerMove = (gameCode) => {
+    const game = games.get(gameCode);
+    if (!game) return;
+
+    const AI_PLAYER = PLAYER_COLORS.RED;
+    const HUMAN_PLAYER = PLAYER_COLORS.BLUE;
+
+    // Safety check - ensure its AI's turn
+    if (game.currentPlayer !== AI_PLAYER) return;
+
+    // Calculate AI's best move
+    const move = calculateAIMove(game.board, AI_PLAYER);
+
+    // No valid moves for AI
+    if (!move) {
+        console.log("Shifu has no valid moves");
+
+        const humanMoves = getValidMoves(game.board, HUMAN_PLAYER);
+
+        if (humanMoves.length > 0) {
+            // Human can continue
+            game.currentPlayer = HUMAN_PLAYER;
+            io.to(gameCode).emit("notification", "Shifu has no valid moves. Your turn again!");
+            emitGameState(gameCode);
+        } else {
+            // Neither player can move - game over
+            checkAndEmitGameOver(gameCode);
         }
+        return;
+    }
 
-        if (hasOpponentBetween && x >= 0 && x < 8 && y >= 0 && y < 8 && board[x][y].player === player) {
-            valid = true;
-        }
+    // Apply the AI move using shared logic
+    const result = applyMove(game, AI_PLAYER, move.row, move.col, move.type);
+
+    if (!result.success) {
+        console.error("AI made an invalid move:", result.error);
+        return;
+    }
+
+    // Generate Shifu's witty comment
+    const {blue, red} = calculatePieceCount(game.board);
+    const shifuComment = generateShifuComment(blue, red);
+
+    io.to(gameCode).emit("shifuComment", {
+        text: shifuComment.text,
+        emoji: shifuComment.emoji,
+        type: shifuComment.type
     });
 
-    return valid;
+    // Emit updated game state
+    emitGameState(gameCode);
+
+    // Handle no moves for opponent
+    if (result.noMovesForOpponent) {
+        io.to(gameCode).emit("notification", "You have no valid moves. Shifu plays again!");
+
+        // AI goes again after a delay
+        setTimeout(() => {
+            makeComputerMove(gameCode);
+        }, 1000);
+        return;
+    }
+
+    // Check if game ended
+    checkAndEmitGameOver(gameCode);
 };
 
-const flipPieces = (board, row, col, player, type, shieldedCells) => {
-    const opponent = player === 'B' ? 'R' : 'B';
-    const newBoard = board.map(row => row.slice());
-
-    directions.forEach(([dx, dy]) => {
-        let x = row + dx;
-        let y = col + dy;
-        const piecesToFlip = [];
-
-        while (x >= 0 && x < 8 && y >= 0 && y < 8 && board[x][y].player === opponent) {
-            const isShielded =
-                shieldedCells['B'].some(([shieldRow, shieldCol]) => shieldRow === x && shieldCol === y) ||
-                shieldedCells['R'].some(([shieldRow, shieldCol]) => shieldRow === x && shieldCol === y);
-
-            if (!isShielded) {
-                piecesToFlip.push([x, y]);
-            } else {
-                break; // Stop flipping when encountering a shielded cell
-            }
-            x += dx;
-            y += dy;
-        }
-
-        if (piecesToFlip.length > 0 && x >= 0 && x < 8 && y >= 0 && y < 8 && board[x][y].player === player) {
-            piecesToFlip.forEach(([fx, fy]) => {
-                newBoard[fx][fy] = {type: board[fx][fy].type, player};
-            });
-        }
-    });
-
-    newBoard[row][col] = {type, player};
-    return newBoard;
-};
-
-const calculateValidMoves = (board, player) => {
-    const moves = [];
-    board.forEach((row, rowIndex) => {
-        row.forEach((cell, colIndex) => {
-            if (isValidMove(board, rowIndex, colIndex, player, 'regular')) {
-                moves.push([rowIndex, colIndex]);
-            }
-        });
-    });
-    return moves; // Return the array of valid moves
-};
-
+/**
+ * Socket.io connection handler
+ */
 io.on("connection", (socket) => {
-    console.log(`✅ A user connected: ${socket.id}`);
+    console.log("✅ Socket connected:", socket.id);
 
-    socket.on('joinGame', ({gameCode}) => {
-        console.log(`User ${socket.id} requested to join game ${gameCode}`);
+    /**
+     * JOIN GAME - Player joins or creates a game room
+     */
+    socket.on("joinGame", ({gameCode}) => {
+        console.log(`Player ${socket.id} joining game: ${gameCode}`);
+
+        // Create game if it doesn't exist
+        if (!games.has(gameCode)) {
+            games.set(gameCode, createGameState());
+            console.log(`New game created: ${gameCode}`);
+        }
+
+        const game = games.get(gameCode);
+
+        // Check if player is already in the game (reconnection)
+        if (game.players[socket.id]) {
+            console.log(` Player ${socket.id} reconnecting to game ${gameCode}`);
+            socket.join(gameCode);
+            socket.emit("assignedColor", game.players[socket.id]);
+            emitGameState(gameCode);
+            return;
+        }
+
+        // Shifu mode - player is always Blue
+        if (gameCode === GAME_MODES.SHIFU) {
+            game.players[socket.id] = PLAYER_COLORS.BLUE;
+            socket.join(gameCode);
+            socket.emit("assignedColor", PLAYER_COLORS.BLUE);
+            emitGameState(gameCode);
+            console.log(`✅ Player ${socket.id} assigned Blue (Shifu mode)`);
+            return;
+        }
+
+        // Multiplayer mode - check if game is full
+        if (Object.keys(game.players).length >= 2) {
+            socket.emit("error", "Game is full");
+            console.log(`⛔ Game ${gameCode} is full`);
+            return;
+        }
+
+        // Assign color: first player gets Blue, second gets Red
+        const assignedColor = Object.keys(game.players).length === 0
+            ? PLAYER_COLORS.BLUE
+            : PLAYER_COLORS.RED;
+
+        game.players[socket.id] = assignedColor;
         socket.join(gameCode);
 
-        if (!games[gameCode]) {
-            games[gameCode] = {
-                board: getInitialBoard(),
-                currentPlayer: 'B',
-                players: {},
-                shieldedCells: {B: [], R: []},
-                gameCode
-            };
-        }
+        console.log(`✅ Player ${socket.id} assigned ${assignedColor === PLAYER_COLORS.BLUE ? 'Blue' : 'Red'}`);
 
-        const game = games[gameCode];
-        // Check if the user is already in the game
-        if (game.players.B === socket.id || game.players.R === socket.id) {
-            console.log(`⛔ User ${socket.id} is already in game ${gameCode}`);
-            return;
-        }
-
-        // Assign players strictly as 'B' or 'R'
-        if (!game.players.B) {
-            game.players.B = socket.id;
-            socket.emit('assignedColor', 'B');
-            console.log(`✅ User ${socket.id} assigned Blue (B)`);
-        } else if (!game.players.R) {
-            game.players.R = socket.id;
-            socket.emit('assignedColor', 'R');
-            console.log(`✅ User ${socket.id} assigned Red (R)`);
-        } else {
-            // Reject extra players
-            socket.emit('error', 'Game is full.');
-            console.log(`⛔ User ${socket.id} tried to join a full game.`);
-            return;
-        }
-
-        if (gameCode === 'computer') {
-            game.currentPlayer = 'B';
-        }
-
-        io.to(gameCode).emit('gameState', game);
+        socket.emit("assignedColor", assignedColor);
+        emitGameState(gameCode);
     });
 
-    socket.on('makeMove', ({gameCode, move}) => {
-        console.log(`Move made in game ${gameCode}:`, move);
-        const game = games[gameCode];
-        if (!game) return;
+    /**
+     * MAKE MOVE - Player makes a move on the board
+     * Server validates and applies the move
+     */
+    socket.on("makeMove", ({gameCode, row, col, type}) => {
+        console.log(`Move attempt in ${gameCode}: [${row}, ${col}], type: ${type}`);
 
-        const {row, col, player, type} = move;
-
-        // Validate turn
-        if (game.currentPlayer !== player) {
-            console.log(`Invalid move: It's ${game.currentPlayer}'s turn.`);
+        const game = games.get(gameCode);
+        if (!game) {
+            socket.emit("error", "Game not found");
             return;
         }
 
-        // Validate player identity
-        if (game.players[player] !== socket.id) {
-            console.log(`Invalid move: ${socket.id} is not playing as ${player}.`);
+        const player = game.players[socket.id];
+        if (!player) {
+            socket.emit("error", "You are not in this game");
             return;
         }
 
-        // Validate shield placement
-        if (type === 'shield' && game.shieldedCells[player].some(([r, c]) => r === row && c === col)) {
-            console.log(`Invalid move: Shield already placed in this cell.`);
+        // Validate it's the player's turn
+        if (player !== game.currentPlayer) {
+            socket.emit("error", "Not your turn");
+            console.log(`⛔ Not ${player}'s turn, it's ${game.currentPlayer}'s turn`);
             return;
         }
 
-        // Update board and shielded cells
+        // Apply the move using shared logic
+        const result = applyMove(game, player, row, col, type);
+
+        if (!result.success) {
+            socket.emit("error", result.error);
+            console.log(`⛔ ${result.error} at [${row}, ${col}]`);
+            return;
+        }
+
+        // Emit shield update if shield was placed
         if (type === 'shield') {
-            game.shieldedCells[player].push([row, col]);
-            io.to(gameCode).emit('shieldsUpdated', game.shieldedCells); // Sync shielded cells
+            io.to(gameCode).emit('shieldsUpdated', game.shieldedCells);
         }
 
-        game.board = flipPieces(game.board, row, col, player, type, game.shieldedCells);
-        const nextPlayer = player === 'B' ? 'R' : 'B';
-        const nextValidMoves = calculateValidMoves(game.board, nextPlayer);
-
-        if (nextValidMoves.length > 0) {
-            game.currentPlayer = nextPlayer;
-        } else {
-            game.currentPlayer = player;
-            io.to(gameCode).emit('notification', `${nextPlayer === 'B' ? 'Blue' : 'Red'} has no valid moves, your turn again!`);
+        // Notify if opponent has no moves
+        if (result.noMovesForOpponent) {
+            io.to(gameCode).emit('notification', `${result.opponentName} has no valid moves, your turn again!`);
         }
 
-        io.to(gameCode).emit('gameState', {
-            board: game.board,
-            currentPlayer: game.currentPlayer,
-            shieldedCells: game.shieldedCells
-        });
+        // Broadcast updated game state
+        emitGameState(gameCode);
+
+        // Check if game is over
+        if (checkAndEmitGameOver(gameCode)) {
+            return; // Game ended
+        }
+
+        // Trigger AI move if in Shifu mode and it's AI's turn
+        if (gameCode === GAME_MODES.SHIFU && game.currentPlayer === PLAYER_COLORS.RED) {
+            setTimeout(() => {
+                makeComputerMove(gameCode);
+            }, 1000); // 1 second delay for better UX
+        }
     });
 
-    socket.on("disconnect", () => {
-        console.log(`❌ User disconnected: ${socket.id}`);
+    /**
+     * RESTART GAME - Reset the game state
+     */
+    socket.on("restartGame", ({gameCode}) => {
+        console.log(`Restart requested for game: ${gameCode}`);
 
-        for (const gameCode in games) {
-            const game = games[gameCode];
-            for (const color in game.players) {
-                if (game.players[color] === socket.id) {
-                    console.log(`Player ${color} disconnected from game ${gameCode}`);
-                    game.players[color] = null; // Keep their spot reserved
+        const game = games.get(gameCode);
+        if (!game) {
+            socket.emit("error", "Game not found");
+            return;
+        }
+
+        // Reset game state
+        game.board = createInitialBoard();
+        game.currentPlayer = PLAYER_COLORS.BLUE;
+        game.shieldedCells = {
+            [PLAYER_COLORS.BLUE]: [],
+            [PLAYER_COLORS.RED]: [],
+        };
+        game.shieldUsed = {
+            [PLAYER_COLORS.BLUE]: false,
+            [PLAYER_COLORS.RED]: false,
+        };
+
+        console.log(`✅ Game ${gameCode} restarted`);
+
+        // Signal restart to reset client UI state
+        io.to(gameCode).emit("gameRestarted");
+
+        // Broadcast fresh game state
+        emitGameState(gameCode);
+
+        // Notify players
+        io.to(gameCode).emit("notification", "Game restarted!");
+    });
+
+    /**
+     * DISCONNECT - Player leaves the game
+     */
+    socket.on("disconnect", () => {
+        console.log("❌ Socket disconnected:", socket.id);
+
+        // Find and clean up any games this player was in
+        for (const [gameCode, game] of games.entries()) {
+            if (game.players[socket.id]) {
+                console.log(`Player ${socket.id} left game ${gameCode}`);
+                delete game.players[socket.id];
+
+                // Delete game if no players left
+                if (Object.keys(game.players).length === 0) {
+                    games.delete(gameCode);
+                    console.log(`🗑️ Game ${gameCode} deleted (no players left)`);
+                } else {
+                    // Notify remaining player
+                    io.to(gameCode).emit("notification", "Your opponent disconnected");
                 }
+                break;
             }
         }
     });

@@ -7,16 +7,18 @@ import { CELL_TYPES, PLAYER_COLORS, IMAGE_PATHS } from '../constants/gameConstan
  * @param {Function} onSelect - Callback when ducky is selected
  * @param {string} assignedColor - Player's color
  * @param {Object} shieldUsed - Object tracking shield usage per player
- * @param {Function} onNotification - Callback to display notifications
+ * @param {Function} showNotification - Callback to display notifications
  */
-const DuckySelector = ({ selectedDucky, onSelect, assignedColor, shieldUsed, onNotification }) => {
+const DuckySelector = ({ selectedDucky, onSelect, assignedColor, shieldUsed, showNotification }) => {
   const handleShieldClick = () => {
     if (shieldUsed[assignedColor]) {
-      onNotification('You can only use the shield once!');
+      showNotification('You can only use the shield once!');
     } else {
       onSelect(CELL_TYPES.SHIELD);
     }
   };
+
+  const handleBombClick = ()=> {showNotification('Feature not available yet!');}
 
   const getImagePath = (type) => {
     const isBlue = assignedColor === PLAYER_COLORS.BLUE;
@@ -59,17 +61,17 @@ const DuckySelector = ({ selectedDucky, onSelect, assignedColor, shieldUsed, onN
       </button>
 
       {/* Bomber Ducky */}
-      <button
-        onClick={() => onSelect(CELL_TYPES.BOMB)}
-        className={selectedDucky === CELL_TYPES.BOMB ? 'selected' : ''}
-      >
-        <p className="button-text">Bomber Ducky</p>
-        <img
-          className="duckie-img"
-          src={getImagePath(CELL_TYPES.BOMB)}
-          alt="Bomber Ducky"
-        />
-      </button>
+        <button
+            onClick={handleBombClick}
+            className={`coming-soon ${selectedDucky === CELL_TYPES.BOMB ? 'selected' : ''}`}
+        >
+            <p className="button-text">Bomber Ducky (Coming Soon..)</p>
+            <img
+                className="duckie-img"
+                src={getImagePath(CELL_TYPES.BOMB)}
+                alt="Bomber Ducky"
+            />
+        </button>
     </div>
   );
 };

@@ -3,14 +3,34 @@
  * These functions are framework-agnostic and can be used on frontend/backend
  */
 
-import { BOARD_SIZE, PLAYER_COLORS, DIRECTIONS } from '../constants/gameConstants';
+const { BOARD_SIZE, PLAYER_COLORS, DIRECTIONS, CELL_TYPES} = require('../constants/gameConstants');
+
+/**
+ * Create initial board with standard Reversi starting position
+ */
+const createInitialBoard = () => {
+  const board = Array.from({length: BOARD_SIZE}, () =>
+      Array.from({length: BOARD_SIZE}, () => ({
+        player: null,
+        type: CELL_TYPES.EMPTY,
+      }))
+  );
+
+  const mid = BOARD_SIZE / 2;
+  board[mid - 1][mid - 1] = {player: PLAYER_COLORS.RED, type: CELL_TYPES.REGULAR};
+  board[mid][mid] = {player: PLAYER_COLORS.RED, type: CELL_TYPES.REGULAR};
+  board[mid - 1][mid] = {player: PLAYER_COLORS.BLUE, type: CELL_TYPES.REGULAR};
+  board[mid][mid - 1] = {player: PLAYER_COLORS.BLUE, type: CELL_TYPES.REGULAR};
+
+  return board;
+};
 
 /**
  * Create a deep clone of the game board
  * @param {Array<Array>} board - 2D array representing the game board
  * @returns {Array<Array>} Cloned board
  */
-export const cloneBoard = (board) => {
+const cloneBoard = (board) => {
   return board.map(row => row.slice());
 };
 
@@ -19,13 +39,13 @@ export const cloneBoard = (board) => {
  * @param {Array<Array>} board - The game board
  * @returns {Object} Object with blue and red piece counts
  */
-export const calculatePieceCount = (board) => {
+const calculatePieceCount = (board) => {
   let blue = 0;
   let red = 0;
   board.forEach(row => {
     row.forEach(cell => {
-      if (cell.player === 'B') blue++;
-      if (cell.player === 'R') red++;
+      if (cell.player === PLAYER_COLORS.BLUE) blue++;
+      if (cell.player === PLAYER_COLORS.RED) red++;
     });
   });
   return { blue, red };
@@ -39,7 +59,7 @@ export const calculatePieceCount = (board) => {
  * @param {string} player - Player color ('B' or 'R')
  * @returns {boolean} True if move is valid
  */
-export const isValidMove = (board, row, col, player) => {
+const isValidMove = (board, row, col, player) => {
   // Cell must be empty
   if (board[row][col].player !== null) return false;
   
@@ -74,7 +94,7 @@ export const isValidMove = (board, row, col, player) => {
  * @param {string} player - Player color ('B' or 'R')
  * @returns {Array<Array<number>>} Array of [row, col] coordinates
  */
-export const getValidMoves = (board, player) => {
+const getValidMoves = (board, player) => {
   const moves = [];
   board.forEach((row, rowIndex) => {
     row.forEach((cell, colIndex) => {
@@ -96,7 +116,7 @@ export const getValidMoves = (board, player) => {
  * @param {Object} shieldedCells - Object with arrays of shielded cell coordinates per player
  * @returns {Array<Array>} New board with flipped pieces
  */
-export const flipPieces = (board, row, col, player, type, shieldedCells) => {
+const flipPieces = (board, row, col, player, type, shieldedCells) => {
   const opponent = player === PLAYER_COLORS.BLUE ? PLAYER_COLORS.RED : PLAYER_COLORS.BLUE;
   const newBoard = cloneBoard(board);
 
@@ -146,7 +166,7 @@ export const flipPieces = (board, row, col, player, type, shieldedCells) => {
  * @param {Array<Array>} board - The game board
  * @returns {Object} Object with isGameOver flag and winner (if any)
  */
-export const checkGameOver = (board) => {
+const checkGameOver = (board) => {
   const isBoardFull = board.every(row => row.every(cell => cell.player !== null));
   
   // Check if both players have valid moves
@@ -174,23 +194,12 @@ export const checkGameOver = (board) => {
   return { isGameOver: true, winner };
 };
 
-/**
- * Validate if a cell can be shielded
- * @param {Array<Array>} board - The game board
- * @param {number} row - Row index
- * @param {number} col - Column index
- * @param {string} player - Player attempting to shield
- * @returns {Object} Object with isValid flag and error message
- */
-export const canShieldCell = (board, row, col, player) => {
-  const opponent = player === PLAYER_COLORS.BLUE ? PLAYER_COLORS.RED : PLAYER_COLORS.BLUE;
-  
-  if (board[row][col].player === opponent) {
-    return { 
-      isValid: false, 
-      error: "Cannot shield opponent's cell!" 
-    };
-  }
-  
-  return { isValid: true, error: null };
+module.exports = {
+  createInitialBoard,
+  cloneBoard,
+  calculatePieceCount,
+  isValidMove,
+  getValidMoves,
+  flipPieces,
+  checkGameOver
 };
